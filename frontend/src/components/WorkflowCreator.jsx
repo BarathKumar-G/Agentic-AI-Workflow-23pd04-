@@ -2,6 +2,9 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import apiClient from '../api/client'
 
+const SUPPORTED_MODELS = ['kimi-k2p5', 'kimi-k2-instruct-0905']
+const CONTEXT_STRATEGIES = ['auto', 'full', 'summary', 'extract']
+
 function WorkflowCreator() {
   const navigate = useNavigate()
   const [name, setName] = useState('')
@@ -10,6 +13,7 @@ function WorkflowCreator() {
       step_order: 1,
       model: '',
       prompt: '',
+      completion_type: 'any',
       completion_rule: '',
       context_strategy: 'auto'
     }
@@ -24,6 +28,7 @@ function WorkflowCreator() {
         step_order: steps.length + 1,
         model: '',
         prompt: '',
+        completion_type: 'any',
         completion_rule: '',
         context_strategy: 'auto'
       }
@@ -33,7 +38,6 @@ function WorkflowCreator() {
   const removeStep = (index) => {
     if (steps.length > 1) {
       const newSteps = steps.filter((_, i) => i !== index)
-      // Reorder step numbers
       newSteps.forEach((step, i) => {
         step.step_order = i + 1
       })
@@ -44,7 +48,42 @@ function WorkflowCreator() {
   const updateStep = (index, field, value) => {
     const newSteps = [...steps]
     newSteps[index][field] = value
+    
+    if (field === 'completion_type') {
+      newSteps[index].completion_rule = ''
+    }
+    
     setSteps(newSteps)
+  }
+
+  const buildCompletionRule = (step) => {
+    if (step.completion_type === 'any') {
+      return null
+    } else if (step.completion_type === 'simple') {
+      return JSON.stringify({
+        type: 'simple',
+        rule: step.completion_rule
+      })
+    } else if (step.completion_type === 'json') {
+      try {
+        const schema = JSON.parse(step.completion_rule || '{}')
+        return JSON.stringify({
+          type: 'json',
+          schema: schema
+        })
+      } catch (e) {
+        return JSON.stringify({
+          type: 'json',
+          schema: {}
+        })
+      }
+    } else if (step.completion_type === 'judge') {
+      return JSON.stringify({
+        type: 'judge',
+        prompt: step.completion_rule
+      })
+    }
+    return null
   }
 
   const handleSubmit = async (e) => {
@@ -67,9 +106,11 @@ function WorkflowCreator() {
       const workflow = {
         name: name.trim(),
         steps: steps.map(step => ({
-          ...step,
-          model: step.model.trim() || null,
-          completion_rule: step.completion_rule.trim() || null
+          step_order: step.step_order,
+          model: step.model || null,
+          prompt: step.prompt.trim(),
+          completion_rule: buildCompletionRule(step),
+          context_strategy: step.context_strategy
         }))
       }
 
@@ -80,6 +121,62 @@ function WorkflowCreator() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const renderCompletionRuleInput = (step, index) => {
+    if (step.completion_type === 'any') {
+      return (
+        <p className="text-sm text-gray-500 mt-1">
+          Any response will be accepted
+        </p>
+      )
+    } else if (step.completion_type === 'simple') {
+      return (
+        <div>
+          <input
+            type="text"
+            value={step.completion_rule}
+            onChange={(e) => updateStep(index, 'completion_rule', e.target.value)}
+            className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            placeholder="String to match or regex pattern"
+          />
+          <p className="mt-1 text-xs text-gray-500">
+              Use substring matching or regex patterns (e.g., AI or {'\\d{2,}'})
+          </p>
+        </div>
+      )
+    } else if (step.completion_type === 'json') {
+      return (
+        <div>
+          <textarea
+            value={step.completion_rule}
+            onChange={(e) => updateStep(index, 'completion_rule', e.target.value)}
+            rows={4}
+            className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            placeholder='JSON schema example: {"type":"object","properties":{"title":{"type":"string"}}}'
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            JSON schema to validate response structure
+          </p>
+        </div>
+      )
+    } else if (step.completion_type === 'judge') {
+      return (
+        <div>
+          <textarea
+            value={step.completion_rule}
+            onChange={(e) => updateStep(index, 'completion_rule', e.target.value)}
+            rows={2}
+            className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            placeholder="Does this response contain a valid Python function?"
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            AI judge will evaluate the response based on this criteria
+          </p>
+        </div>
+      )
+    }
+    return null
   }
 
   return (
@@ -148,15 +245,18 @@ function WorkflowCreator() {
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                       <label className="block text-sm font-medium text-gray-700">
-                        Model (optional)
+                        Model
                       </label>
-                      <input
-                        type="text"
+                      <select
                         value={step.model}
                         onChange={(e) => updateStep(index, 'model', e.target.value)}
                         className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                        placeholder="gpt-4, gpt-3.5-turbo, etc."
-                      />
+                      >
+                        <option value="">Use default model (kimi-k2p5)</option>
+                        {SUPPORTED_MODELS.map(model => (
+                          <option key={model} value={model}>{model}</option>
+                        ))}
+                      </select>
                     </div>
 
                     <div>
@@ -168,10 +268,11 @@ function WorkflowCreator() {
                         onChange={(e) => updateStep(index, 'context_strategy', e.target.value)}
                         className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                       >
-                        <option value="auto">Auto</option>
-                        <option value="full">Full</option>
-                        <option value="summary">Summary</option>
-                        <option value="extract">Extract</option>
+                        {CONTEXT_STRATEGIES.map(strategy => (
+                          <option key={strategy} value={strategy}>
+                            {strategy.charAt(0).toUpperCase() + strategy.slice(1)}
+                          </option>
+                        ))}
                       </select>
                     </div>
                   </div>
@@ -192,19 +293,28 @@ function WorkflowCreator() {
 
                   <div className="mt-4">
                     <label className="block text-sm font-medium text-gray-700">
-                      Completion Rule (optional)
+                      Completion Type
                     </label>
-                    <input
-                      type="text"
-                      value={step.completion_rule}
-                      onChange={(e) => updateStep(index, 'completion_rule', e.target.value)}
+                    <select
+                      value={step.completion_type}
+                      onChange={(e) => updateStep(index, 'completion_type', e.target.value)}
                       className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                      placeholder="String to match or regex pattern"
-                    />
-                    <p className="mt-1 text-xs text-gray-500">
-                      Leave empty to accept any response. Use regex or substring matching.
-                    </p>
+                    >
+                      <option value="any">Any response</option>
+                      <option value="simple">String / Regex match</option>
+                      <option value="json">JSON structure validation</option>
+                      <option value="judge">LLM judge prompt</option>
+                    </select>
                   </div>
+
+                  {step.completion_type !== 'any' && (
+                    <div className="mt-4">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Completion Rule
+                      </label>
+                      {renderCompletionRuleInput(step, index)}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

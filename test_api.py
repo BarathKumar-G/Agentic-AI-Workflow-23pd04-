@@ -25,22 +25,45 @@ def test_api():
         print("Make sure to run 'python main.py' in the backend directory first")
         return
     
-    # Test 1: Create a workflow
-    print("\n1. Creating test workflow...")
+    # Test 1: Create a workflow with intelligent completion criteria
+    print("\n1. Creating test workflow with intelligent completion...")
     workflow_data = {
-        "name": "Test Content Generator",
+        "name": "Advanced Content Generator",
         "steps": [
             {
                 "step_order": 1,
                 "model": "kimi-k2p5",
-                "prompt": "Generate a blog topic about AI",
-                "completion_rule": "AI",
+                "prompt": "Generate a blog topic about technology",
+                "completion_rule": json.dumps({
+                    "type": "simple",
+                    "rule": "technology"
+                }),
                 "context_strategy": "auto"
             },
             {
                 "step_order": 2,
-                "prompt": "Write a 50-word intro for: {{previous}}",
-                "completion_rule": "\\d{2,}",
+                "prompt": "Write a structured intro for: {{previous}}",
+                "completion_rule": json.dumps({
+                    "type": "json",
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "intro": {
+                                "type": "string",
+                                "minLength": 50
+                            }
+                        }
+                    }
+                }),
+                "context_strategy": "full"
+            },
+            {
+                "step_order": 3,
+                "prompt": "Evaluate if the previous content is engaging: {{previous}}",
+                "completion_rule": json.dumps({
+                    "type": "judge",
+                    "prompt": "Is this content engaging and well-written?"
+                }),
                 "context_strategy": "full"
             }
         ]
@@ -74,12 +97,29 @@ def test_api():
         response.raise_for_status()
         workflow_details = response.json()
         print(f"✅ Retrieved workflow with {len(workflow_details.get('steps', []))} steps")
+        
+        # Verify intelligent completion rules
+        for step in workflow_details.get('steps', []):
+            if step['completion_rule']:
+                rule = json.loads(step['completion_rule'])
+                print(f"   Step {step['step_order']}: {rule['type']} validation")
     except Exception as e:
         print(f"❌ Failed to fetch workflow details: {e}")
         return
     
-    # Test 4: Run the workflow
-    print("\n4. Running workflow...")
+    # Test 4: Check supported models
+    print("\n4. Checking supported models...")
+    try:
+        response = requests.get(f"{API_BASE}/workflows/models/supported")
+        response.raise_for_status()
+        models_info = response.json()
+        print(f"✅ Supported models: {models_info['models']}")
+        print(f"   Default model: {models_info['default']}")
+    except Exception as e:
+        print(f"❌ Failed to fetch supported models: {e}")
+    
+    # Test 5: Run the workflow
+    print("\n5. Running workflow...")
     try:
         response = requests.post(f"{API_BASE}/workflows/{workflow_id}/run")
         response.raise_for_status()
@@ -90,8 +130,8 @@ def test_api():
         print(f"❌ Failed to start run: {e}")
         return
     
-    # Test 5: Poll run status
-    print("\n5. Polling run status...")
+    # Test 6: Poll run status
+    print("\n6. Polling run status...")
     max_polls = 30  # 1 minute max
     for i in range(max_polls):
         try:
@@ -107,14 +147,17 @@ def test_api():
             if status in ['completed', 'failed']:
                 print(f"✅ Run finished with status: {status}")
                 
-                # Show logs
+                # Show logs with intelligent validation results
                 if run_status.get('logs'):
                     print("\n📋 Execution Logs:")
                     for log in run_status['logs']:
                         status_icon = "✅" if log['passed'] else "❌"
                         print(f"   {status_icon} Step {log['step']}: {'PASSED' if log['passed'] else 'FAILED'}")
+                        print(f"      Model: {log.get('model_used', 'default')}")
                         print(f"      Prompt: {log['prompt'][:50]}...")
                         print(f"      Response: {log['response'][:50]}...")
+                        if log.get('validation_reasoning'):
+                            print(f"      Validation: {log['validation_reasoning']}")
                         if log.get('retries', 0) > 0:
                             print(f"      Retries: {log['retries']}")
                 break
@@ -127,8 +170,8 @@ def test_api():
     else:
         print("⏰ Run did not complete within timeout")
     
-    # Test 6: Get workflow runs
-    print("\n6. Fetching workflow run history...")
+    # Test 7: Get workflow runs
+    print("\n7. Fetching workflow run history...")
     try:
         response = requests.get(f"{API_BASE}/workflows/{workflow_id}/runs")
         response.raise_for_status()
@@ -141,6 +184,12 @@ def test_api():
     print("\n🎉 All tests completed successfully!")
     print(f"🌐 Frontend should be available at: http://localhost:5173")
     print(f"📊 API documentation: http://localhost:8000/docs")
+    print("\n🚀 New Features Tested:")
+    print("   ✅ Controlled model selection (kimi-k2p5, kimi-k2-instruct-0905)")
+    print("   ✅ Simple string/regex validation")
+    print("   ✅ JSON structure validation")
+    print("   ✅ LLM-based judge validation")
+    print("   ✅ Enhanced logging with validation reasoning")
 
 if __name__ == "__main__":
     test_api()

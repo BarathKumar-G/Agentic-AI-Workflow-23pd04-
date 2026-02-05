@@ -39,6 +39,7 @@ class LogEntry(BaseModel):
     retries: int
     timestamp: datetime
     model_used: Optional[str] = None
+    validation_reasoning: Optional[str] = None
 
 class Run(BaseModel):
     id: str

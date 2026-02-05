@@ -14,6 +14,11 @@ missing_vars = [var for var in required_vars if not os.getenv(var)]
 if missing_vars:
     raise ValueError(f"Missing required environment variables: {', '.join(missing_vars)}")
 
+# Validate Unbound API key
+UNBOUND_API_KEY = os.getenv("UNBOUND_API_KEY")
+if not UNBOUND_API_KEY or UNBOUND_API_KEY.strip() == "":
+    raise ValueError("UNBOUND_API_KEY is required and cannot be empty. Set it in your .env file.")
+
 app = FastAPI(title="Agentic Workflow Builder", version="1.0.0")
 
 # CORS middleware

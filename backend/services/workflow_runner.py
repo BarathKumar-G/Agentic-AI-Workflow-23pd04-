@@ -6,7 +6,7 @@ from services.supabase_client import (
     get_workflow_with_steps, 
     update_run_logs
 )
-from services.unbound_client import generate_text
+from services.unbound_client import generate_text, judge_response, validate_model
 
 class WorkflowRunner:
     def __init__(self, run_id: str, workflow_id: str):
@@ -58,6 +58,9 @@ class WorkflowRunner:
         
         for retry in range(max_retries + 1):
             try:
+                # Validate and set model
+                model = validate_model(step.get("model"))
+                
                 # Inject context into prompt
                 prompt = self._inject_context(
                     step["prompt"], 
@@ -66,10 +69,17 @@ class WorkflowRunner:
                 )
                 
                 # Call LLM
-                response = await generate_text(prompt, step.get("model"))
+                response = await generate_text(prompt, model)
                 
-                # Validate response
-                passed = self._validate_response(response, step.get("completion_rule"))
+                # Validate response using intelligent completion criteria
+                validation_result = await self._validate_response_intelligent(
+                    response, 
+                    step.get("completion_rule"),
+                    model
+                )
+                
+                passed = validation_result["passed"]
+                reasoning = validation_result.get("reasoning", "")
                 
                 # Log the attempt
                 log_entry = {
@@ -79,7 +89,8 @@ class WorkflowRunner:
                     "passed": passed,
                     "retries": retry,
                     "timestamp": datetime.now(),
-                    "model_used": step.get("model")
+                    "model_used": model,
+                    "validation_reasoning": reasoning
                 }
                 
                 self.logs.append(log_entry)
@@ -99,7 +110,8 @@ class WorkflowRunner:
                     "passed": False,
                     "retries": retry,
                     "timestamp": datetime.now(),
-                    "model_used": step.get("model")
+                    "model_used": step.get("model"),
+                    "validation_reasoning": f"Execution error: {str(e)}"
                 }
                 
                 self.logs.append(log_entry)
@@ -145,21 +157,113 @@ class WorkflowRunner:
         # Replace placeholder in prompt
         return prompt.replace("{{previous}}", context)
     
-    def _validate_response(self, response: str, completion_rule: Optional[str]) -> bool:
-        """Validate response against completion rule"""
+    async def _validate_response_intelligent(self, response: str, completion_rule: Optional[str], model: str) -> Dict[str, Any]:
+        """Intelligent validation using multiple modes"""
         if not completion_rule:
-            return True
+            return {"passed": True, "reasoning": "No validation rule specified"}
+        
+        try:
+            # Try to parse as JSON completion rule
+            rule_data = json.loads(completion_rule)
+            rule_type = rule_data.get("type", "simple")
+            
+            if rule_type == "simple":
+                # Mode A: Simple string/regex match
+                rule_value = rule_data.get("rule", "")
+                return self._validate_simple(response, rule_value)
+                
+            elif rule_type == "json":
+                # Mode B: JSON structure validation
+                schema = rule_data.get("schema", {})
+                return self._validate_json_structure(response, schema)
+                
+            elif rule_type == "judge":
+                # Mode C: LLM-based judge
+                judge_prompt = rule_data.get("prompt", "")
+                return await self._validate_with_judge(response, judge_prompt, model)
+                
+        except json.JSONDecodeError:
+            # Fallback to simple string match for backward compatibility
+            return self._validate_simple(response, completion_rule)
+        
+        return {"passed": False, "reasoning": "Invalid completion rule format"}
+    
+    def _validate_simple(self, response: str, rule: str) -> Dict[str, Any]:
+        """Mode A: Simple string or regex validation"""
+        if not rule:
+            return {"passed": True, "reasoning": "No rule specified"}
         
         try:
             # Try as regex first
-            if re.search(completion_rule, response, re.IGNORECASE):
-                return True
+            if re.search(rule, response, re.IGNORECASE):
+                return {"passed": True, "reasoning": f"Regex pattern '{rule}' matched"}
         except re.error:
             # Fall back to substring match
-            if completion_rule.lower() in response.lower():
-                return True
+            if rule.lower() in response.lower():
+                return {"passed": True, "reasoning": f"Substring '{rule}' found"}
         
+        return {"passed": False, "reasoning": f"Pattern '{rule}' not found in response"}
+    
+    def _validate_json_structure(self, response: str, schema: Dict[str, Any]) -> Dict[str, Any]:
+        """Mode B: JSON structure validation"""
+        try:
+            # Try to extract JSON from response
+            json_start = response.find("{")
+            json_end = response.rfind("}") + 1
+            
+            if json_start >= 0 and json_end > json_start:
+                json_str = response[json_start:json_end]
+                parsed_json = json.loads(json_str)
+                
+                # Basic schema validation
+                if self._validate_json_schema(parsed_json, schema):
+                    return {"passed": True, "reasoning": "JSON structure matches schema"}
+                else:
+                    return {"passed": False, "reasoning": "JSON structure does not match schema"}
+            else:
+                return {"passed": False, "reasoning": "No valid JSON found in response"}
+                
+        except json.JSONDecodeError:
+            return {"passed": False, "reasoning": "Invalid JSON format in response"}
+    
+    def _validate_json_schema(self, data: Any, schema: Dict[str, Any]) -> bool:
+        """Basic JSON schema validation"""
+        schema_type = schema.get("type")
+        
+        if schema_type == "object" and isinstance(data, dict):
+            properties = schema.get("properties", {})
+            for prop, prop_schema in properties.items():
+                if prop in data:
+                    if not self._validate_json_schema(data[prop], prop_schema):
+                        return False
+            return True
+            
+        elif schema_type == "string" and isinstance(data, str):
+            min_length = schema.get("minLength", 0)
+            max_length = schema.get("maxLength", float('inf'))
+            return min_length <= len(data) <= max_length
+            
+        elif schema_type == "number" and isinstance(data, (int, float)):
+            return True
+            
+        elif schema_type == "array" and isinstance(data, list):
+            return True
+            
         return False
+    
+    async def _validate_with_judge(self, response: str, judge_prompt: str, model: str) -> Dict[str, Any]:
+        """Mode C: LLM-based validation"""
+        if not judge_prompt:
+            return {"passed": False, "reasoning": "No judge prompt specified"}
+        
+        try:
+            judgment = await judge_response(response, judge_prompt, model)
+            return {
+                "passed": judgment.get("passed", False),
+                "reasoning": f"Judge: {judgment.get('reasoning', 'No reasoning provided')}"
+            }
+        except Exception as e:
+            return {"passed": False, "reasoning": f"Judge error: {str(e)}"}
     
     async def _save_logs(self):
         """Save current logs to database"""

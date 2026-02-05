@@ -5,25 +5,39 @@ from services.supabase_client import (
     create_workflow, create_steps, get_workflows, 
     get_workflow_with_steps, create_run, get_runs_by_workflow
 )
+from services.unbound_client import SUPPORTED_MODELS, validate_model
 from services.workflow_runner import WorkflowRunner
 import asyncio
 
 router = APIRouter()
 
+@router.get("/models/supported")
+async def get_supported_models():
+    """Get list of supported models"""
+    return {"models": SUPPORTED_MODELS, "default": "kimi-k2p5"}
+
 @router.post("/", response_model=Workflow)
 async def create_workflow_endpoint(workflow: WorkflowCreate):
     """Create a new workflow with steps"""
     try:
+        # Validate models in steps
+        for step in workflow.steps:
+            if step.model and step.model not in SUPPORTED_MODELS:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Model '{step.model}' not supported. Allowed models: {SUPPORTED_MODELS}"
+                )
+        
         # Create workflow
         workflow_data = create_workflow(workflow.name)
         workflow_id = workflow_data["id"]
         
-        # Create steps
+        # Create steps with validated models
         steps_data = []
         for step in workflow.steps:
             steps_data.append({
                 "step_order": step.step_order,
-                "model": step.model,
+                "model": validate_model(step.model),
                 "prompt": step.prompt,
                 "completion_rule": step.completion_rule,
                 "context_strategy": step.context_strategy
@@ -35,6 +49,8 @@ async def create_workflow_endpoint(workflow: WorkflowCreate):
         # Return created workflow with steps
         return await get_workflow_endpoint(workflow_id)
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error creating workflow: {str(e)}")
 

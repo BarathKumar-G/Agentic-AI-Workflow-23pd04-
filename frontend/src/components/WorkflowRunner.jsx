@@ -72,6 +72,31 @@ function WorkflowRunner() {
     }
   }
 
+  const parseCompletionRule = (rule) => {
+    if (!rule) return { type: 'any' }
+    
+    try {
+      return JSON.parse(rule)
+    } catch {
+      return { type: 'simple', rule }
+    }
+  }
+
+  const formatCompletionRule = (rule) => {
+    const parsed = parseCompletionRule(rule)
+    
+    switch (parsed.type) {
+      case 'simple':
+        return `String/Regex: "${parsed.rule}"`
+      case 'json':
+        return 'JSON Structure Validation'
+      case 'judge':
+        return `AI Judge: "${parsed.prompt}"`
+      default:
+        return 'Any Response'
+    }
+  }
+
   if (error) {
     return (
       <div className="px-4 sm:px-6 lg:px-8">
@@ -117,6 +142,31 @@ function WorkflowRunner() {
               </button>
             )}
           </div>
+
+          {/* Workflow Steps Preview */}
+          {workflow.steps && (
+            <div className="mb-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-3">Workflow Steps</h3>
+              <div className="space-y-3">
+                {workflow.steps.map((step, index) => (
+                  <div key={step.id} className="border border-gray-200 rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-medium text-gray-900">Step {step.step_order}</span>
+                      <div className="flex items-center space-x-2 text-xs text-gray-500">
+                        <span>{step.model || 'kimi-k2p5'}</span>
+                        <span>•</span>
+                        <span>{step.context_strategy}</span>
+                      </div>
+                    </div>
+                    <p className="text-sm text-gray-700 mb-2">{step.prompt}</p>
+                    <p className="text-xs text-gray-500">
+                      Validation: {formatCompletionRule(step.completion_rule)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {run && (
             <div className="space-y-6">
@@ -181,6 +231,15 @@ function WorkflowRunner() {
                               {log.response}
                             </div>
                           </div>
+
+                          {log.validation_reasoning && (
+                            <div>
+                              <div className="text-xs font-medium text-gray-500 mb-1">Validation:</div>
+                              <div className="text-sm text-gray-600 bg-white rounded p-2 border border-gray-200">
+                                {log.validation_reasoning}
+                              </div>
+                            </div>
+                          )}
 
                           <div className="text-xs text-gray-500">
                             {new Date(log.timestamp).toLocaleString()}
