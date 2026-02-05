@@ -45,8 +45,17 @@ function RunHistory() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <div className="px-4 sm:px-6 lg:px-8">
+        <div className="max-w-6xl mx-auto">
+          <div className="mb-6">
+            <Link to="/" className="text-blue-600 hover:text-blue-800 text-sm">
+              ← Back to Workflows
+            </Link>
+          </div>
+          <div className="flex justify-center items-center h-64">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          </div>
+        </div>
       </div>
     )
   }
@@ -54,8 +63,18 @@ function RunHistory() {
   if (error) {
     return (
       <div className="px-4 sm:px-6 lg:px-8">
-        <div className="bg-red-50 border border-red-200 rounded-md p-4">
-          <div className="text-red-800">Error: {error}</div>
+        <div className="max-w-6xl mx-auto">
+          <div className="mb-6">
+            <Link to="/" className="text-blue-600 hover:text-blue-800 text-sm">
+              ← Back to Workflows
+            </Link>
+          </div>
+          <div className="bg-red-50 border border-red-200 rounded-md p-4">
+            <div className="text-red-800">Error: {error}</div>
+            <div className="mt-2 text-sm text-red-600">
+              Workflow not found or failed to load run history.
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -79,7 +98,7 @@ function RunHistory() {
           <div className="bg-white shadow rounded-lg p-6 text-center">
             <div className="text-gray-500">No runs yet</div>
             <Link
-              to={`/workflow/${id}/run`}
+              to={`/run/${id}`}
               className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
             >
               Start First Run

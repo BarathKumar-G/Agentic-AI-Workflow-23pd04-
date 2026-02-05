@@ -107,3 +107,17 @@ def get_runs_by_workflow(workflow_id: str) -> List[Dict[str, Any]]:
     """Get all runs for a workflow"""
     result = supabase.table("runs").select("*").eq("workflow_id", workflow_id).order("created_at", desc=True).execute()
     return result.data
+
+def delete_workflow(workflow_id: str):
+    """Delete workflow and cascade delete steps and runs"""
+    # Delete runs first
+    supabase.table("runs").delete().eq("workflow_id", workflow_id).execute()
+    
+    # Delete steps
+    supabase.table("steps").delete().eq("workflow_id", workflow_id).execute()
+    
+    # Delete workflow
+    result = supabase.table("workflows").delete().eq("id", workflow_id).execute()
+    
+    if not result.data:
+        raise Exception("Workflow not found")

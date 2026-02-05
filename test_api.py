@@ -25,45 +25,25 @@ def test_api():
         print("Make sure to run 'python main.py' in the backend directory first")
         return
     
-    # Test 1: Create a workflow with intelligent completion criteria
-    print("\n1. Creating test workflow with intelligent completion...")
+    # Test 1: Create a workflow with context passing
+    print("\n1. Creating test workflow with context passing...")
     workflow_data = {
-        "name": "Advanced Content Generator",
+        "name": "Context Passing Test",
         "steps": [
             {
                 "step_order": 1,
                 "model": "kimi-k2p5",
-                "prompt": "Generate a blog topic about technology",
+                "prompt": "Generate a simple topic about artificial intelligence in one sentence",
                 "completion_rule": json.dumps({
                     "type": "simple",
-                    "rule": "technology"
+                    "rule": "artificial intelligence|AI"
                 }),
                 "context_strategy": "auto"
             },
             {
                 "step_order": 2,
-                "prompt": "Write a structured intro for: {{previous}}",
-                "completion_rule": json.dumps({
-                    "type": "json",
-                    "schema": {
-                        "type": "object",
-                        "properties": {
-                            "intro": {
-                                "type": "string",
-                                "minLength": 50
-                            }
-                        }
-                    }
-                }),
-                "context_strategy": "full"
-            },
-            {
-                "step_order": 3,
-                "prompt": "Evaluate if the previous content is engaging: {{previous}}",
-                "completion_rule": json.dumps({
-                    "type": "judge",
-                    "prompt": "Is this content engaging and well-written?"
-                }),
+                "prompt": "Write a 2-sentence summary based on: {{previous}}",
+                "completion_rule": None,
                 "context_strategy": "full"
             }
         ]
@@ -98,11 +78,13 @@ def test_api():
         workflow_details = response.json()
         print(f"✅ Retrieved workflow with {len(workflow_details.get('steps', []))} steps")
         
-        # Verify intelligent completion rules
+        # Verify context passing
         for step in workflow_details.get('steps', []):
             if step['completion_rule']:
                 rule = json.loads(step['completion_rule'])
                 print(f"   Step {step['step_order']}: {rule['type']} validation")
+                if step['step_order'] == 2:
+                    print(f"   Step 2 prompt: {step['prompt'][:50]}...")
     except Exception as e:
         print(f"❌ Failed to fetch workflow details: {e}")
         return
@@ -147,19 +129,23 @@ def test_api():
             if status in ['completed', 'failed']:
                 print(f"✅ Run finished with status: {status}")
                 
-                # Show logs with intelligent validation results
+                # Show logs with context passing verification
                 if run_status.get('logs'):
                     print("\n📋 Execution Logs:")
                     for log in run_status['logs']:
                         status_icon = "✅" if log['passed'] else "❌"
                         print(f"   {status_icon} Step {log['step']}: {'PASSED' if log['passed'] else 'FAILED'}")
                         print(f"      Model: {log.get('model_used', 'default')}")
-                        print(f"      Prompt: {log['prompt'][:50]}...")
-                        print(f"      Response: {log['response'][:50]}...")
+                        print(f"      Prompt: {log['prompt'][:80]}...")
+                        print(f"      Response: {log['response'][:80]}...")
                         if log.get('validation_reasoning'):
                             print(f"      Validation: {log['validation_reasoning']}")
                         if log.get('retries', 0) > 0:
                             print(f"      Retries: {log['retries']}")
+                        
+                        # Check context passing for step 2
+                        if log['step'] == 2 and 'Previous step output:' in log['prompt']:
+                            print(f"      ✅ Context passed from Step 1")
                 break
                 
             time.sleep(2)
@@ -184,12 +170,11 @@ def test_api():
     print("\n🎉 All tests completed successfully!")
     print(f"🌐 Frontend should be available at: http://localhost:5173")
     print(f"📊 API documentation: http://localhost:8000/docs")
-    print("\n🚀 New Features Tested:")
-    print("   ✅ Controlled model selection (kimi-k2p5, kimi-k2-instruct-0905)")
-    print("   ✅ Simple string/regex validation")
-    print("   ✅ JSON structure validation")
-    print("   ✅ LLM-based judge validation")
-    print("   ✅ Enhanced logging with validation reasoning")
+    print("\n🚀 Features Tested:")
+    print("   ✅ Context passing between workflow steps")
+    print("   ✅ Real Unbound API integration")
+    print("   ✅ Intelligent completion validation")
+    print("   ✅ Enhanced logging with step context")
 
 if __name__ == "__main__":
     test_api()

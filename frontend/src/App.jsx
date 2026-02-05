@@ -39,7 +39,10 @@ function App() {
           <Routes>
             <Route path="/" element={<WorkflowList />} />
             <Route path="/create" element={<WorkflowCreator />} />
+            <Route path="/workflow/:id" element={<WorkflowRunner />} />
+            <Route path="/run/:id" element={<WorkflowRunner />} />
             <Route path="/workflow/:id/run" element={<WorkflowRunner />} />
+            <Route path="/history/:id" element={<RunHistory />} />
             <Route path="/workflow/:id/history" element={<RunHistory />} />
           </Routes>
         </main>

@@ -32,7 +32,7 @@ class WorkflowRunner:
             steps.sort(key=lambda x: x["step_order"])
             
             # Execute steps sequentially
-            previous_output = ""
+            previous_output = None
             
             for step in steps:
                 success = await self._execute_step(step, previous_output)
@@ -124,7 +124,7 @@ class WorkflowRunner:
     
     def _inject_context(self, prompt: str, previous_output: str, strategy: Optional[str]) -> str:
         """Inject context from previous step based on strategy"""
-        if not previous_output or not strategy:
+        if not previous_output:
             return prompt
         
         context = previous_output
@@ -154,8 +154,11 @@ class WorkflowRunner:
                 # Looks structured, keep as is
                 pass
         
-        # Replace placeholder in prompt
-        return prompt.replace("{{previous}}", context)
+        # Replace placeholder in prompt or auto-append
+        if "{{previous}}" in prompt:
+            return prompt.replace("{{previous}}", context)
+        else:
+            return f"{prompt}\n\nPrevious step output:\n{context}"
     
     async def _validate_response_intelligent(self, response: str, completion_rule: Optional[str], model: str) -> Dict[str, Any]:
         """Intelligent validation using multiple modes"""

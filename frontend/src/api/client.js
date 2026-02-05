@@ -56,6 +56,12 @@ class ApiClient {
     return this.request(`/workflows/${id}/runs`)
   }
 
+  async deleteWorkflow(id) {
+    return this.request(`/workflows/${id}`, {
+      method: 'DELETE',
+    })
+  }
+
   // Runs
   async getRun(id) {
     return this.request(`/runs/${id}`)

@@ -11,6 +11,18 @@ import asyncio
 
 router = APIRouter()
 
+@router.delete("/{workflow_id}")
+async def delete_workflow_endpoint(workflow_id: str):
+    """Delete workflow and all associated data"""
+    try:
+        from services.supabase_client import delete_workflow
+        delete_workflow(workflow_id)
+        return {"message": "Workflow deleted successfully"}
+    except Exception as e:
+        if "not found" in str(e).lower():
+            return {"message": "Workflow not found or already deleted"}
+        raise HTTPException(status_code=500, detail=f"Error deleting workflow: {str(e)}")
+
 @router.get("/models/supported")
 async def get_supported_models():
     """Get list of supported models"""
