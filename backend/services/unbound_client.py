@@ -19,15 +19,15 @@ for env_path in env_paths:
 else:
     load_dotenv()  # fallback to default behavior
 
-UNBOUND_API_KEY = os.getenv("UNBOUND_API_KEY")
-DEFAULT_MODEL = "kimi-k2p5"
-
-# Available models - CONTROLLED LIST
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 SUPPORTED_MODELS = [
-    "kimi-k2p5",
-    "kimi-k2-instruct-0905"
+    "google/gemini-2.0-flash-exp:free",        # Google - fast, 1M context
+    "meta-llama/llama-3.3-70b-instruct:free",  # Meta - GPT-4 level quality
+    "deepseek/deepseek-r1:free",               # DeepSeek - great reasoning
+    "mistralai/mistral-small-3.1-24b-instruct:free",  # Mistral - solid all-rounder
+    "nvidia/llama-3.1-nemotron-nano-8b-v1:free",      # NVIDIA - lightweight/fast
 ]
-
+DEFAULT_MODEL = "google/gemini-2.0-flash-exp:free"
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -43,20 +43,20 @@ def validate_model(model: Optional[str]) -> str:
     return model
 
 async def generate_text(prompt: str, model: Optional[str] = None) -> str:
-    """Generate text using Unbound API"""
+    """Generate text using openrouter API"""
     
     model_to_use = validate_model(model)
     
-    if not UNBOUND_API_KEY:
-        logger.error("UNBOUND_API_KEY not found - this should not happen if startup validation works")
+    if not OPENROUTER_API_KEY:
+        logger.error("OPENROUTER_API_KEY not found - this should not happen if startup validation works")
         return f"Configuration error: API key missing for model {model_to_use}"
     
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(
-                "https://api.getunbound.ai/v1/chat/completions",
+                "https://openrouter.ai/api/v1/chat/completions",
                 headers={
-                    "Authorization": f"Bearer {UNBOUND_API_KEY}",
+                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
                     "Content-Type": "application/json"
                 },
                 json={
@@ -67,7 +67,7 @@ async def generate_text(prompt: str, model: Optional[str] = None) -> str:
                 }
             )
             
-            logger.info(f"Unbound API response status: {response.status_code}")
+            logger.info(f"Openrouter API response status: {response.status_code}")
             
             if response.status_code == 200:
                 data = response.json()
@@ -76,14 +76,14 @@ async def generate_text(prompt: str, model: Optional[str] = None) -> str:
                 return content
             else:
                 error_text = response.text
-                logger.error(f"Unbound API error {response.status_code}: {error_text}")
+                logger.error(f"Openrouter API error {response.status_code}: {error_text}")
                 return f"API Error ({response.status_code}): Falling back to mock response for '{prompt[:30]}...'"
                 
     except httpx.TimeoutException:
-        logger.error("Unbound API timeout")
+        logger.error("Openrouter API timeout")
         return f"Timeout error: Mock response for '{prompt[:30]}...'"
     except Exception as e:
-        logger.error(f"Unbound API exception: {str(e)}")
+        logger.error(f"Openrouter API exception: {str(e)}")
         return f"Connection error: Mock response for '{prompt[:30]}...'"
 
 async def judge_response(response: str, judge_prompt: str, model: Optional[str] = None) -> Dict[str, Any]:
@@ -101,16 +101,16 @@ Respond with ONLY a JSON object in this exact format:
 {{"passed": true/false, "reasoning": "brief explanation"}}
 """
     
-    if not UNBOUND_API_KEY:
-        logger.error("UNBOUND_API_KEY not found for judge")
+    if not OPENROUTER_API_KEY:
+        logger.error("OPENROUTER_API_KEY not found for judge")
         return {"passed": True, "reasoning": "Judge unavailable - API key missing"}
     
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
             api_response = await client.post(
-                "https://api.getunbound.ai/v1/chat/completions",
+                "https://openrouter.ai/api/v1/chat/completions",
                 headers={
-                    "Authorization": f"Bearer {UNBOUND_API_KEY}",
+                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
                     "Content-Type": "application/json"
                 },
                 json={
