@@ -3,11 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import apiClient from '../api/client'
 
 const SUPPORTED_MODELS = [
-  'google/gemini-2.0-flash-exp:free',
+  'openrouter/free',
   'meta-llama/llama-3.3-70b-instruct:free',
   'deepseek/deepseek-r1:free',
   'mistralai/mistral-small-3.1-24b-instruct:free',
-  'nvidia/llama-3.1-nemotron-nano-8b-v1:free',
+  'google/gemma-3-27b-it:free',
 ]
 const CONTEXT_STRATEGIES = ['auto', 'full', 'summary', 'extract']
 

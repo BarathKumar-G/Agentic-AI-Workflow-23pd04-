@@ -32,7 +32,7 @@ def test_api():
         "steps": [
             {
                 "step_order": 1,
-                "model": "kimi-k2p5",
+                "model": "openrouter/free",
                 "prompt": "Generate a simple topic about artificial intelligence in one sentence",
                 "completion_rule": json.dumps({
                     "type": "simple",
@@ -42,6 +42,7 @@ def test_api():
             },
             {
                 "step_order": 2,
+                "model": "openrouter/free",
                 "prompt": "Write a 2-sentence summary based on: {{previous}}",
                 "completion_rule": None,
                 "context_strategy": "full"
@@ -50,7 +51,7 @@ def test_api():
     }
     
     try:
-        response = requests.post(f"{API_BASE}/workflows", json=workflow_data)
+        response = requests.post(f"{API_BASE}/workflows/", json=workflow_data)
         response.raise_for_status()
         workflow = response.json()
         print(f"✅ Created workflow: {workflow['name']} (ID: {workflow['id']})")
@@ -62,7 +63,7 @@ def test_api():
     # Test 2: Get all workflows
     print("\n2. Fetching all workflows...")
     try:
-        response = requests.get(f"{API_BASE}/workflows")
+        response = requests.get(f"{API_BASE}/workflows/")
         response.raise_for_status()
         workflows = response.json()
         print(f"✅ Found {len(workflows)} workflows")
@@ -172,7 +173,7 @@ def test_api():
     print(f"📊 API documentation: http://localhost:8000/docs")
     print("\n🚀 Features Tested:")
     print("   ✅ Context passing between workflow steps")
-    print("   ✅ Real Unbound API integration")
+    print("   ✅ OpenRouter API integration (free models)")
     print("   ✅ Intelligent completion validation")
     print("   ✅ Enhanced logging with step context")
 

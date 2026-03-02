@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from typing import List
+import traceback
 from models.schemas import Workflow, WorkflowCreate, Run
 from services.supabase_client import (
     create_workflow, create_steps, get_workflows, 
@@ -26,7 +27,7 @@ async def delete_workflow_endpoint(workflow_id: str):
 @router.get("/models/supported")
 async def get_supported_models():
     """Get list of supported models"""
-    return {"models": SUPPORTED_MODELS, "default": "kimi-k2p5"}
+    return {"models": SUPPORTED_MODELS, "default": "openrouter/free"}
 
 @router.post("/", response_model=Workflow)
 async def create_workflow_endpoint(workflow: WorkflowCreate):
@@ -64,6 +65,7 @@ async def create_workflow_endpoint(workflow: WorkflowCreate):
     except HTTPException:
         raise
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error creating workflow: {str(e)}")
 
 @router.get("/", response_model=List[Workflow])

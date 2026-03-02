@@ -21,13 +21,13 @@ else:
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 SUPPORTED_MODELS = [
-    "google/gemini-2.0-flash-exp:free",        # Google - fast, 1M context
-    "meta-llama/llama-3.3-70b-instruct:free",  # Meta - GPT-4 level quality
-    "deepseek/deepseek-r1:free",               # DeepSeek - great reasoning
-    "mistralai/mistral-small-3.1-24b-instruct:free",  # Mistral - solid all-rounder
-    "nvidia/llama-3.1-nemotron-nano-8b-v1:free",      # NVIDIA - lightweight/fast
+    "openrouter/free",
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "deepseek/deepseek-r1:free",
+    "mistralai/mistral-small-3.1-24b-instruct:free",
+    "google/gemma-3-27b-it:free",
 ]
-DEFAULT_MODEL = "google/gemini-2.0-flash-exp:free"
+DEFAULT_MODEL = "openrouter/free"
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
